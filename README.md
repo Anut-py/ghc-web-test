@@ -20,8 +20,8 @@ nix shell https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm
 ```
 
 This will enter a nix flake with the GHC to WASM compiler available. Now run
-the `build_haskell.sh` file. This will compile the Haskell code with all the
-necessary configurations.
+the `build_haskell.sh` file in this flake. This will compile the Haskell code
+with all the necessary configurations.
 
 You can then run `exit` to terminate the Nix flake.
 
