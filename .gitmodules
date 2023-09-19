@@ -1,3 +1,3 @@
-[submodule "raylib-web"]
-	path = raylib-web
-	url = ./raylib-web
+[submodule "raylib"]
+	path = raylib
+	url = https://github.com/raysan5/raylib.git

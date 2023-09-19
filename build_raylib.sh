@@ -3,11 +3,11 @@ EMAR=emar
 
 set -e
 echo "Checking if raylib is built..."
-if [ ! -f "raylib-web/src/libraylib.a" ]; then
+if [ ! -f "raylib/src/libraylib.a" ]; then
   echo "raylib archive does not exist"
   echo $'Building raylib...\n'
 
-  cd raylib-web/src
+  cd raylib/src
 
   $EMCC -c rcore.c -pthread -Os -Wall -DPLATFORM_WEB -DGRAPHICS_API_OPENGL_ES2
   $EMCC -c rshapes.c -pthread -Os -Wall -DPLATFORM_WEB -DGRAPHICS_API_OPENGL_ES2
@@ -28,8 +28,8 @@ fi
 
 echo $'Compiling bindings...'
 
-emcc cbits/rl_bindings.c raylib-web/src/libraylib.a \
-  -Iraylib-web/src \
+emcc cbits/rl_bindings.c raylib/src/libraylib.a \
+  -Iraylib/src \
   -DPLATFORM_WEB \
   -DGRAPHICS_API_OPENGL_ES2 \
   \
