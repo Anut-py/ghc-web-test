@@ -1,4 +1,7 @@
+cd haskell
+
 echo $'Building project...\n'
+cabal clean
 cabal build
 if [ $? -ne 0 ]; then
   echo "Error: Project build failed"

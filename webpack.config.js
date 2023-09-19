@@ -14,6 +14,10 @@ const config = {
     devServer: {
         open: true,
         host: 'localhost',
+        headers: {
+            "Cross-Origin-Opener-Policy": "same-origin",
+            "Cross-Origin-Embedder-Policy": "require-corp"
+        }
     },
     plugins: [
         new HtmlWebpackPlugin({
@@ -41,6 +45,13 @@ const config = {
     },
     resolve: {
         extensions: ['.tsx', '.ts', '.jsx', '.js', '.wasm', '...'],
+        fallback: {
+            path: false,
+            fs: false,
+            crypto: false,
+            perf_hooks: false,
+            worker_threads: false
+        }
     },
 };
 
