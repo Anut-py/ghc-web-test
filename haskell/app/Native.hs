@@ -9,9 +9,9 @@ foreign import ccall "main.h jslog" cjslog :: CString -> CUInt -> IO ()
 
 foreign import ccall "main.h jsfree" jsfree :: Ptr () -> IO ()
 
-foreign import ccall "main.h callRaylibFunction" ccallRaylibFunction :: CString -> CUInt -> Ptr (Ptr ()) -> Ptr CUInt -> Ptr CUChar -> CUInt -> CUInt -> IO (Ptr ())
+foreign import ccall "main.h callRaylibFunction" ccallRaylibFunction :: CString -> CUInt -> Ptr (Ptr ()) -> Ptr CUInt -> Ptr CUChar -> CUInt -> CUInt -> CUChar -> IO (Ptr ())
 
-data ParamType = SignedIntParam | UnsignedIntParam | FloatParam deriving (Enum)
+data ParamType = SignedIntParam | UnsignedIntParam | FloatParam | VoidParam deriving (Enum)
 
 data ProcessedParam = ProcessedParam (Ptr ()) Int Int
 
@@ -21,8 +21,8 @@ processParam val pType = do
   poke ptr val
   return $ ProcessedParam (castPtr ptr) (sizeOf val) (fromEnum pType)
 
-callRaylibFunction :: (Storable a) => String -> [ProcessedParam] -> Int -> IO a
-callRaylibFunction func params returnSize = do
+callRaylibFunction :: (Storable a) => String -> [ProcessedParam] -> Int -> ParamType -> IO a
+callRaylibFunction func params returnSize rType = do
   let l = length func
       p = length params
   namePtr <- mallocArray l
@@ -42,7 +42,7 @@ callRaylibFunction func params returnSize = do
   typesPtr <- mallocArray p
   pokeArray typesPtr signs
 
-  resPtr <- ccallRaylibFunction namePtr nameLen ptrsPtr sizesPtr typesPtr numParams (fromIntegral returnSize)
+  resPtr <- ccallRaylibFunction namePtr nameLen ptrsPtr sizesPtr typesPtr numParams (fromIntegral returnSize) (fromIntegral $ fromEnum rType)
   res <- peek (castPtr resPtr)
 
   jsfree resPtr

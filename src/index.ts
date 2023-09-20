@@ -4,7 +4,15 @@ import {
   OpenFile,
   PreopenDirectory,
 } from "@bjorn3/browser_wasi_shim";
-import { bufToString, readArrayUint32, WASMInstance, Heaps, readArrayNonuniform, readBytes } from "./util";
+import {
+  bufToString,
+  readArrayUint32,
+  WASMInstance,
+  Heaps,
+  readArrayNonuniform,
+  readBytes,
+  ParamTypes,
+} from "./util";
 import _raylib from "./raylib";
 
 window.addEventListener("load", () => {
@@ -25,8 +33,8 @@ window.addEventListener("load", () => {
   const memory = new WebAssembly.Memory({
     initial: 512,
     maximum: 1024,
-    shared: true
-  })
+    shared: true,
+  });
   const Module: any = {
     preRun: [] as any[],
     postRun: [] as any[],
@@ -64,7 +72,7 @@ window.addEventListener("load", () => {
           : "All downloads complete."
       );
     },
-    wasmMemory: memory
+    wasmMemory: memory,
   };
   Module.setStatus("Downloading...");
   window.onerror = () => {
@@ -73,7 +81,7 @@ window.addEventListener("load", () => {
 
   (async () => {
     const raylib = await _raylib(Module);
-    
+
     const wasm = await WebAssembly.compileStreaming(fetch("./haskell.wasm")); // Load the WASM file
     const heaps = new Heaps();
     let inst: WASMInstance = (await WebAssembly.instantiate(wasm, {
@@ -92,44 +100,49 @@ window.addEventListener("load", () => {
           paramSizesPtr: number,
           paramTypesPtr: number,
           paramNum: number,
-          returnSizeBytes: number
+          returnSizeBytes: number,
+          returnType: number
         ) => {
           heaps.useMemory(memory);
           const name = bufToString(heaps, namePtr, nameLen);
-          const paramSizes = readArrayUint32(
-            heaps,
-            paramSizesPtr,
-            paramNum
-          );
+          const paramSizes = readArrayUint32(heaps, paramSizesPtr, paramNum);
           const paramTypes = readBytes(heaps, paramTypesPtr, paramNum);
           const params = readArrayNonuniform(
             heaps,
             paramsPtr,
             paramSizes,
             paramTypes
-          )
+          );
           const result = raylib[name](...params);
           if (returnSizeBytes === 0) return;
 
           const ptr = raylib._malloc(returnSizeBytes);
-          if (returnSizeBytes === 1) heaps.HEAP8[ptr] = result;
-          else if (returnSizeBytes === 2) heaps.HEAP16[ptr / 2] = result;
-          else if (returnSizeBytes === 4) heaps.HEAP32[ptr / 4] = result;
+          const signed = returnType === ParamTypes.SIGNED_INT;
+          if (returnSizeBytes === 1)
+            (signed ? heaps.HEAP8 : heaps.HEAPU8)[ptr] = result;
+          else if (returnSizeBytes === 2)
+            (signed ? heaps.HEAP16 : heaps.HEAPU16)[ptr / 2] = result;
+          else if (returnSizeBytes === 4)
+            (returnType === ParamTypes.FLOAT
+              ? heaps.HEAPF32
+              : signed
+              ? heaps.HEAP32
+              : heaps.HEAPU32)[ptr / 4] = result;
           else console.log("got unknown return size:", returnSizeBytes);
-          
+
           return ptr;
         },
         free: (ptr: number) => {
           raylib._free(ptr);
         },
-        memory: memory
+        memory: memory,
       },
     })) as any;
-    inst = {...inst, exports: {...inst.exports, memory}};
-    
+    inst = { ...inst, exports: { ...inst.exports, memory } };
+
     wasi.initialize(inst);
     inst.exports.hs_init(0, 0); // This must be called before calling any exported functions
-    
+
     inst.exports.startup();
     raylib.setMainLoop(() => inst.exports.mainLoop());
   })();

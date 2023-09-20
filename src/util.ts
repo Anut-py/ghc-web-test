@@ -50,7 +50,7 @@ export function readArrayNonuniform(
   return items;
 }
 
-enum ParamTypes {
+export enum ParamTypes {
   SIGNED_INT,
   UNSIGNED_INT,
   FLOAT,

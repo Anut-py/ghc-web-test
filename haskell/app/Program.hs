@@ -22,7 +22,7 @@ foreign export ccall teardown :: IO ()
 startup :: IO ()
 startup = do
   initWindow 600 400 "raylib example - basic window"
-  setTargetFPS 60
+  setTargetFPS 120
   height <- getScreenHeight
   jslog ("screen height: " ++ show height)
   return ()
