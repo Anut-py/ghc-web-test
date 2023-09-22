@@ -5,6 +5,7 @@ version:       0.1.0.0
 executable haskell
   main-is:          Program.hs
   other-modules:
+    Processable
     Native
     Raylib
 
@@ -15,6 +16,6 @@ executable haskell
   include-dirs:     cbits
   ghc-options:
     -no-hs-main -optl-mexec-model=reactor
-    "-optl-Wl,--export=hs_init,--export=startup,--export=mainLoop,--export=teardown"
+    "-optl-Wl,--export=hs_init,--export=startup,--export=mainLoop,--export=shouldClose,--export=teardown"
     "-optl-Wl,--import-memory" "-optl-Wl,--shared-memory"
     "-optl-Wl,--max-memory=67108864" "-optl-Wl,--no-check-features"

@@ -1,8 +1,16 @@
 {-# OPTIONS -Wall #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Native (ParamType (..), ProcessedParam (..), processParam, callRaylibFunction, jslog) where
 
-import Foreign (Ptr, Storable (peek, poke, sizeOf), castPtr, free, malloc, mallocArray, pokeArray)
+import Foreign (Ptr, Storable (peek, sizeOf), castPtr, free, mallocArray, pokeArray)
 import Foreign.C (CChar, CString, CUChar (..), CUInt (..), castCharToCChar, withCStringLen)
+import Processable
+  ( ParamType (..),
+    Processable (processableType),
+    ProcessedParam (..),
+    processParam,
+  )
 
 -- These are the JS functions that will be used
 foreign import ccall "main.h jslog" cjslog :: CString -> CUInt -> IO ()
@@ -11,18 +19,8 @@ foreign import ccall "main.h jsfree" jsfree :: Ptr () -> IO ()
 
 foreign import ccall "main.h callRaylibFunction" ccallRaylibFunction :: CString -> CUInt -> Ptr (Ptr ()) -> Ptr CUInt -> Ptr CUChar -> CUInt -> CUInt -> CUChar -> IO (Ptr ())
 
-data ParamType = SignedIntParam | UnsignedIntParam | FloatParam | VoidParam deriving (Enum)
-
-data ProcessedParam = ProcessedParam (Ptr ()) Int Int
-
-processParam :: (Storable a) => a -> ParamType -> IO ProcessedParam
-processParam val pType = do
-  ptr <- malloc
-  poke ptr val
-  return $ ProcessedParam (castPtr ptr) (sizeOf val) (fromEnum pType)
-
-callRaylibFunction :: (Storable a) => String -> [ProcessedParam] -> Int -> ParamType -> IO a
-callRaylibFunction func params returnSize rType = do
+callRaylibFunctionRaw :: forall a. (Storable a, Processable a) => String -> [ProcessedParam] -> IO a
+callRaylibFunctionRaw func params = do
   let l = length func
       p = length params
   namePtr <- mallocArray l
@@ -42,7 +40,7 @@ callRaylibFunction func params returnSize rType = do
   typesPtr <- mallocArray p
   pokeArray typesPtr signs
 
-  resPtr <- ccallRaylibFunction namePtr nameLen ptrsPtr sizesPtr typesPtr numParams (fromIntegral returnSize) (fromIntegral $ fromEnum rType)
+  resPtr <- ccallRaylibFunction namePtr nameLen ptrsPtr sizesPtr typesPtr numParams (fromIntegral $ sizeOf (undefined :: a)) (fromIntegral $ fromEnum $ processableType (undefined :: a))
   res <- peek (castPtr resPtr)
 
   jsfree resPtr
@@ -56,3 +54,25 @@ callRaylibFunction func params returnSize rType = do
 
 jslog :: String -> IO ()
 jslog str = withCStringLen str (\(s, len) -> cjslog s (fromIntegral len))
+
+-- For "varargs" function calls, based on https://wiki.haskell.org/Varargs
+class CallRaylibType t where
+  callRaylibFunction' :: String -> IO [ProcessedParam] -> t
+
+instance (Storable a, Processable a) => CallRaylibType (IO a) where
+  callRaylibFunction' func params' = do
+    params <- params'
+    callRaylibFunctionRaw func params
+
+instance (Storable a, Processable a, CallRaylibType r) => CallRaylibType (a -> r) where
+  callRaylibFunction' func params' = \x ->
+    callRaylibFunction'
+      func
+      ( do
+          params <- params'
+          param <- processParam x
+          return $ params ++ [param]
+      )
+
+callRaylibFunction :: (CallRaylibType t) => String -> t
+callRaylibFunction func = callRaylibFunction' func (return [])

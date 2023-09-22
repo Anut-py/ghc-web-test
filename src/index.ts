@@ -144,6 +144,13 @@ window.addEventListener("load", () => {
     inst.exports.hs_init(0, 0); // This must be called before calling any exported functions
 
     inst.exports.startup();
-    raylib.setMainLoop(() => inst.exports.mainLoop());
+    raylib.setMainLoop(() => {
+      if (inst.exports.shouldClose() === 1) {
+        inst.exports.teardown();
+        raylib.pauseMainLoop();
+        return;
+      }
+      inst.exports.mainLoop()
+    });
   })();
 });

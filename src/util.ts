@@ -145,5 +145,6 @@ export type WASMInstance = {
 export type HaskellExports = {
   startup: () => void;
   mainLoop: () => void;
+  shouldClose: () => 0 | 1;
   teardown: () => void;
 };
