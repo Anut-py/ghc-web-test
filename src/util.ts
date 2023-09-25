@@ -84,52 +84,42 @@ export class Heaps {
   }
 
   get HEAPU8(): Uint8Array {
-    if (!this._HEAPU8) this._HEAPU8 = new Uint8Array(this.memory.buffer);
     return this._HEAPU8;
   }
 
   get HEAPU16(): Uint16Array {
-    if (!this._HEAPU16) this._HEAPU16 = new Uint16Array(this.memory.buffer);
     return this._HEAPU16;
   }
 
   get HEAPU32(): Uint32Array {
-    if (!this._HEAPU32) this._HEAPU32 = new Uint32Array(this.memory.buffer);
     return this._HEAPU32;
   }
 
   get HEAPU64(): BigUint64Array {
-    if (!this._HEAPU64) this._HEAPU64 = new BigUint64Array(this.memory.buffer);
     return this._HEAPU64;
   }
 
   get HEAP8(): Int8Array {
-    if (!this._HEAP8) this._HEAP8 = new Int8Array(this.memory.buffer);
     return this._HEAP8;
   }
 
   get HEAP16(): Int16Array {
-    if (!this._HEAP16) this._HEAP16 = new Int16Array(this.memory.buffer);
     return this._HEAP16;
   }
 
   get HEAP32(): Int32Array {
-    if (!this._HEAP32) this._HEAP32 = new Int32Array(this.memory.buffer);
     return this._HEAP32;
   }
 
   get HEAP64(): BigInt64Array {
-    if (!this._HEAP64) this._HEAP64 = new BigInt64Array(this.memory.buffer);
     return this._HEAP64;
   }
 
   get HEAPF32(): Float32Array {
-    if (!this._HEAPF32) this._HEAPF32 = new Float32Array(this.memory.buffer);
     return this._HEAPF32;
   }
 
   get HEAPF64(): Float64Array {
-    if (!this._HEAPF64) this._HEAPF64 = new Float64Array(this.memory.buffer);
     return this._HEAPF64;
   }
 }
@@ -143,8 +133,8 @@ export type WASMInstance = {
 };
 
 export type HaskellExports = {
-  startup: () => void;
-  mainLoop: () => void;
-  shouldClose: () => 0 | 1;
-  teardown: () => void;
+  startup: () => number;
+  mainLoop: (state: number) => number;
+  shouldClose: (state: number) => 0 | 1;
+  teardown: (state: number) => void;
 };

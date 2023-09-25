@@ -2,7 +2,7 @@ cd haskell
 
 echo $'Building project...\n'
 cabal clean
-cabal build
+cabal build --with-compiler=wasm32-wasi-ghc --with-hc-pkg=wasm32-wasi-ghc-pkg
 if [ $? -ne 0 ]; then
   echo "Error: Project build failed"
   exit 1

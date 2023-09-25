@@ -1,5 +1,5 @@
 {-# OPTIONS -Wall #-}
-module Raylib (initWindow, closeWindow, setTargetFPS, beginDrawing, endDrawing, clearBackground, getScreenHeight, drawFPS, drawText, isKeyDown) where
+module Raylib (initWindow, closeWindow, setTargetFPS, beginDrawing, endDrawing, clearBackground, getScreenHeight, drawFPS, drawText, isKeyDown, isMouseButtonPressed) where
 
 import Foreign (with, toBool)
 import Foreign.C (CInt, CUInt, withCString, CBool)
@@ -47,3 +47,6 @@ drawText text x y size color =
 
 isKeyDown :: Int -> IO Bool
 isKeyDown key = toBool <$> (callRaylibFunction "_IsKeyDown_" (fromIntegral key :: CInt) :: IO CBool)
+
+isMouseButtonPressed :: Int -> IO Bool
+isMouseButtonPressed button = toBool <$> (callRaylibFunction "_IsMouseButtonPressed_" (fromIntegral button :: CInt) :: IO CBool)

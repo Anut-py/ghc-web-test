@@ -1,5 +1,6 @@
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -Wno-unrecognised-pragmas #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# HLINT ignore "Redundant lambda" #-}
 
 module Native (ParamType (..), ProcessedParam (..), processParam, callRaylibFunction, jslog) where
 

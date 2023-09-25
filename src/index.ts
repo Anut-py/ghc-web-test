@@ -1,19 +1,21 @@
+import { File, PreopenDirectory, WASI } from "@bjorn3/browser_wasi_shim";
+import _raylib from "./raylib"; // `raylib.js` is an auto-generated file created by emscripten
 import {
-  WASI,
-  File,
-  OpenFile,
-  PreopenDirectory,
-} from "@bjorn3/browser_wasi_shim";
-import {
-  bufToString,
-  readArrayUint32,
-  WASMInstance,
   Heaps,
-  readArrayNonuniform,
-  readBytes,
   ParamTypes,
+  WASMInstance,
+  bufToString,
+  readArrayNonuniform,
+  readArrayUint32,
+  readBytes,
 } from "./util";
-import _raylib from "./raylib";
+import {
+  EventFdReadWrite,
+  EventRwFlags,
+  EventType,
+  Subscription,
+  Event as WasiEvent,
+} from "./wasi_patch";
 
 window.addEventListener("load", () => {
   const args: string[] = []; // Command line arguments, not used
@@ -23,18 +25,22 @@ window.addEventListener("load", () => {
   // logging directly to stdout in the Haskell code doesn't work (which is why
   // I made the `env.log` function). I am not sure what exactly these lines do.
   const fds = [
-    new OpenFile(new File([])), // stdin
-    new OpenFile(new File([])), // stdout
-    new OpenFile(new File([])), // stderr
+    new File([]).open(4), // stdin
+    new File([]).open(4), // stdout
+    new File([]).open(4), // stderr
     new PreopenDirectory(".", {}),
-  ];
-  const wasi = new WASI(args, env, fds);
+  ] as const;
+  const wasi = new WASI(args, env, fds as any);
 
+  // This is a shared memory object, it allows raylib and haskell to use the same memory addresses
+  // This requires a couple headers enabled to work, see https://stackoverflow.com/a/65675390/17907758
   const memory = new WebAssembly.Memory({
     initial: 512,
     maximum: 1024,
     shared: true,
   });
+
+  // These are some bootstrapping functions to initialize emscripten
   const Module: any = {
     preRun: [] as any[],
     postRun: [] as any[],
@@ -80,12 +86,60 @@ window.addEventListener("load", () => {
   };
 
   (async () => {
-    const raylib = await _raylib(Module);
+    const raylib = await _raylib(Module); // Loads the raylib functions
 
     const wasm = await WebAssembly.compileStreaming(fetch("./haskell.wasm")); // Load the WASM file
-    const heaps = new Heaps();
+    const heaps = new Heaps(); // A convenient class for accessing memory
+
     let inst: WASMInstance = (await WebAssembly.instantiate(wasm, {
-      wasi_snapshot_preview1: wasi.wasiImport,
+      wasi_snapshot_preview1: {
+        ...wasi.wasiImport,
+        // Patch for stdout, see https://github.com/TristanCacqueray/browser_wasi_shim/commit/f34ed671b2ce2099983f365e6bb30d6f7fe7009c
+        poll_oneoff: (
+          in_ptr: number,
+          out_ptr: number,
+          nsubscriptions: number
+        ) => {
+          // in_: *const subscription
+          // out: *mut event
+          // nsubscription: usize
+          let buffer = new DataView(inst.exports.memory.buffer);
+          let in_ = Subscription.read_bytes_array(
+            buffer,
+            in_ptr,
+            nsubscriptions
+          );
+          // console.log("poll_oneoff", in_, out_ptr, nsubscriptions);
+          let events = [];
+          for (let sub of in_) {
+            if (sub.u.tag.variant == "fd_read") {
+              let event = new WasiEvent();
+              event.userdata = sub.userdata;
+              event.error = 0;
+              event.type = new EventType("fd_read");
+              event.fd_readwrite = new EventFdReadWrite(
+                BigInt(1),
+                new EventRwFlags()
+              );
+              events.push(event);
+            }
+            if (sub.u.tag.variant == "fd_write") {
+              let event = new WasiEvent();
+              event.userdata = sub.userdata;
+              event.error = 0;
+              event.type = new EventType("fd_write");
+              event.fd_readwrite = new EventFdReadWrite(
+                BigInt(1),
+                new EventRwFlags()
+              );
+              events.push(event);
+            }
+          }
+          // console.log(events);
+          WasiEvent.write_bytes_array(buffer, out_ptr, events);
+          return events.length;
+        },
+      },
 
       // This object contains the functions that are used in the Haskell file
       env: {
@@ -93,6 +147,8 @@ window.addEventListener("load", () => {
           heaps.useMemory(memory);
           console.log(bufToString(heaps, ptr, len));
         },
+        // Calls a raylib function given its name, parameters (as an array of pointers),
+        // and the sizes and types of those parameters
         callRaylibFunction: (
           namePtr: number,
           nameLen: number,
@@ -132,25 +188,28 @@ window.addEventListener("load", () => {
 
           return ptr;
         },
+        // Frees a pointer; a pointer created with `raylib._malloc`cannot be
+        // directly freed in haskell (with `Foreign.Marshal.Alloc.free`), so
+        // this function is called from haskell instead.
         free: (ptr: number) => {
           raylib._free(ptr);
         },
         memory: memory,
       },
     })) as any;
-    inst = { ...inst, exports: { ...inst.exports, memory } };
+    inst = { ...inst, exports: { ...inst.exports, memory } }; // WASI requires the module to export memory
 
     wasi.initialize(inst);
     inst.exports.hs_init(0, 0); // This must be called before calling any exported functions
 
-    inst.exports.startup();
+    let state = inst.exports.startup(); // A pointer to the current state of the program
     raylib.setMainLoop(() => {
-      if (inst.exports.shouldClose() === 1) {
-        inst.exports.teardown();
+      if (inst.exports.shouldClose(state) === 1) {
+        inst.exports.teardown(state);
         raylib.pauseMainLoop();
         return;
       }
-      inst.exports.mainLoop()
+      state = inst.exports.mainLoop(state);
     });
-  })();
+  })().catch((e) => console.log("got error:", e));
 });
